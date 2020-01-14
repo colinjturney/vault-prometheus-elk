@@ -16,9 +16,7 @@ readonly TMP_DIR="/tmp/install"
 readonly SCRIPT_NAME="$(basename "$0")"
 readonly SUPPLIED_VAULT_BIN="vault"
 readonly HOST_IP_ADDRESS=${1}
-readonly VAULT_MODE=${2}
-
-readonly VAULT_VERSION="1.1.3"
+readonly VAULT_SERVER_ADDRESS=${2}
 
 function print_usage {
   echo
@@ -91,7 +89,7 @@ function install_vault {
 
   log "INFO" ${func} "Installing Vault"
 
-  curl -s -o vault.zip https://releases.hashicorp.com/vault/1.3.0/vault_1.3.0_linux_amd64.zip
+  curl -s -o vault.zip https://releases.hashicorp.com/vault/1.3.1/vault_1.3.1_linux_amd64.zip
 
   unzip vault.zip
   sudo chown root:root ${bin}
@@ -106,33 +104,39 @@ function create_vault_install_paths {
   local -r username="$2"
   local -r config="$3"
   local -r ip_addr=${4}
+  local -r vault_server_ip_addr=${5}
 
   log "INFO" ${func} "Creating install dirs for Vault at ${path}"
   log "INFO" ${func} "username = ${username}, config = ${config}"
   sudo mkdir -p "${path}"
   cat << EOF | sudo tee ${TMP_DIR}/outy
 
+vault {
+  address = "http://${vault_server_ip_addr}:8200"
+}
+
 listener "tcp" {
-  address         = "0.0.0.0:8200"
-  cluster_address = "0.0.0.0:8201"
-  tls_disable     = "true"
+  address     = "127.0.0.1:8100"
+  tls_disable = true
 }
 
-storage "consul" {
-  address = "127.0.0.1:7500"
-  path = "vault/"
-  service = "vault"
+auto_auth {
+
+  method "approle" {
+
+    config = {
+      role_id_file_path                   = "/vagrant/jenkins-approle-role-id"
+      secret_id_file_path                 = "/vagrant/jenkins-approle-secret-id"
+      remove_secret_id_file_after_reading = false
+    }
+  }
+
+  sink "file" {
+    config = {
+      path = "/tmp/token"
+    }
+  }
 }
-
-ui = true
-
-telemetry {
-  dogstatsd_addr = "localhost:8125"
-  disable_hostname = true
-}
-
-api_addr = "http://${ip_addr}:8200"
-cluster_addr = "https://${ip_addr}:8201"
 
 EOF
 
@@ -160,14 +164,14 @@ User=vault
 Group=vault
 ProtectSystem=full
 ProtectHome=read-only
-PrivateTmp=yes
+PrivateTmp=no
 PrivateDevices=yes
 SecureBits=keep-caps
 AmbientCapabilities=CAP_IPC_LOCK
 Capabilities=CAP_IPC_LOCK+ep
 CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
 NoNewPrivileges=yes
-ExecStart=/usr/local/bin/vault server -config=/etc/vault.d/vault.hcl
+ExecStart=/usr/local/bin/vault agent -config=/etc/vault.d/vault.hcl
 ExecReload=/bin/kill --signal HUP \$MAINPID
 KillMode=process
 KillSignal=SIGINT
@@ -186,13 +190,6 @@ EOF
 
 }
 
-function setup_bash_profile {
-  cat <<EOF >> /etc/bash.bashrc
-
-export VAULT_ADDR=http://127.0.0.1:8200
-EOF
-}
-
 function main {
   local func="main"
   if [ -e ${TMP_DIR} ]; then
@@ -204,12 +201,11 @@ function main {
   install_dependencies
   create_vault_user "${DEFAULT_VAULT_USER}"
   install_vault "${DEFAULT_INSTALL_PATH}" "${TMP_DIR}" "$SUPPLIED_VAULT_BIN"
-  create_vault_install_paths "${DEFAULT_VAULT_PATH}" "${DEFAULT_VAULT_USER}" "${DEFAULT_VAULT_CONFIG}" "${HOST_IP_ADDRESS}" "${VAULT_MODE}"
+  create_vault_install_paths "${DEFAULT_VAULT_PATH}" "${DEFAULT_VAULT_USER}" "${DEFAULT_VAULT_CONFIG}" "${HOST_IP_ADDRESS}" "${VAULT_SERVER_ADDRESS}"
   create_vault_service "${DEFAULT_VAULT_SERVICE}"
   log "INFO" "${func}" "Vault install complete!"
   sudo rm -rf "${TMP_DIR}"
   sudo systemctl start vault
-  setup_bash_profile
 }
 
 main "$@"

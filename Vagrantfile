@@ -15,11 +15,11 @@ Vagrant.configure("2") do |config|
     end
     subconfig.vm.provision "shell" do |s|
       s.path = "install-vault.sh"
-      s.args = ["10.0.0.10"]
+      s.args = ["10.0.0.10","server"]
     end
     subconfig.vm.provision "shell" do |s|
       s.path =  "install-consul.sh"
-      s.args = ["10.0.0.10", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13"', 'dc1', 0, "false"]
+      s.args = ["10.0.0.10", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13","10.0.0.14"', 'dc1', 0, "false"]
     end
     subconfig.vm.provision "shell" do |s|
       s.path = "install-telegraf.sh"
@@ -36,7 +36,7 @@ Vagrant.configure("2") do |config|
     end
     subconfig.vm.provision "shell" do |s|
       s.path =  "install-consul.sh"
-      s.args = ["10.0.0.11", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13"', 'dc1', 3, "true"]
+      s.args = ["10.0.0.11", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13","10.0.0.14"', 'dc1', 3, "true"]
     end
     subconfig.vm.provision "shell" do |s|
       s.path = "install-telegraf.sh"
@@ -54,7 +54,7 @@ Vagrant.configure("2") do |config|
     end
     subconfig.vm.provision "shell" do |s|
       s.path =  "install-consul.sh"
-      s.args = ["10.0.0.12", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13"', 'dc1', 0, "true"]
+      s.args = ["10.0.0.12", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13","10.0.0.14"', 'dc1', 0, "true"]
     end
     subconfig.vm.provision "shell" do |s|
       s.path = "install-telegraf.sh"
@@ -71,7 +71,7 @@ Vagrant.configure("2") do |config|
     end
     subconfig.vm.provision "shell" do |s|
       s.path =  "install-consul.sh"
-      s.args = ["10.0.0.13", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13"', 'dc1', 0, "true"]
+      s.args = ["10.0.0.13", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13","10.0.0.14"', 'dc1', 0, "true"]
     end
     subconfig.vm.provision "shell" do |s|
       s.path = "install-telegraf.sh"
@@ -79,45 +79,65 @@ Vagrant.configure("2") do |config|
     end
   end
 
-  config.vm.define "prometheus" do |subconfig|
+  config.vm.define "jenkins" do |subconfig|
     subconfig.vm.box = BOX_IMAGE
-    subconfig.vm.hostname = "prometheus"
+    subconfig.vm.hostname = "jenkins"
     subconfig.vm.network "private_network", ip: "10.0.0.14"
-    subconfig.vm.provider :virtualbox do |vb|
-             vb.customize ['modifyvm', :id,'--memory', '1024']
+    # subconfig.vm.provider :virtualbox do |vb|
+    #          vb.customize ['modifyvm', :id,'--memory', '512']
+    # end
+    subconfig.vm.provision "shell", path: "install-jenkins.sh"
+    subconfig.vm.provision "shell" do |s|
+      s.path = "install-vault-agent.sh"
+      s.args = ["10.0.0.14","10.0.0.10"]
     end
     subconfig.vm.provision "shell" do |s|
-      s.path = "install-prometheus.sh"
-      s.args = ['10.0.0.14']
+      s.path =  "install-consul.sh"
+      s.args = ["10.0.0.14", '"10.0.0.10","10.0.0.11","10.0.0.12","10.0.0.13","10.0.0.14"', 'dc1', 0, "false"]
     end
-    subconfig.vm.provision "shell", path: "install-grafana.sh"
-    subconfig.vm.provision "shell", path: "config-grafana.sh"
-    subconfig.vm.network "forwarded_port", guest: 3000, host: 43000
-    subconfig.vm.network "forwarded_port", guest: 9090, host: 49090
   end
 
-  config.vm.define "elasticsearch" do |subconfig|
-    subconfig.vm.box = BOX_IMAGE
-    subconfig.vm.hostname = "elasticsearch"
-    subconfig.vm.network "private_network", ip: "10.0.0.15"
-    subconfig.vm.provider :virtualbox do |vb|
-             vb.customize ['modifyvm', :id,'--memory', '2048']
-    end
-    subconfig.vm.provision "shell" do |s|
-      s.path = "install-elasticsearch.sh"
-      s.args = ["10.0.0.15"]
-    end
-    subconfig.vm.provision "shell" do |s|
-      s.path = "install-kibana.sh"
-      s.args = ["10.0.0.15"]
-    end
-    subconfig.vm.provision "shell" do |s|
-      s.path = "install-logstash.sh"
-      s.args = ["10.0.0.15"]
-    end
-    subconfig.vm.provision "shell" do |s|
-      s.path = "install-rsyslog-server.sh"
-      s.args = ["10.0.0.15"]
-    end
-  end
+
+  # config.vm.define "prometheus" do |subconfig|
+  #   subconfig.vm.box = BOX_IMAGE
+  #   subconfig.vm.hostname = "prometheus"
+  #   subconfig.vm.network "private_network", ip: "10.0.0.15"
+  #   subconfig.vm.provider :virtualbox do |vb|
+  #            vb.customize ['modifyvm', :id,'--memory', '1024']
+  #   end
+  #   subconfig.vm.provision "shell" do |s|
+  #     s.path = "install-prometheus.sh"
+  #     s.args = ['10.0.0.15']
+  #   end
+  #   subconfig.vm.provision "shell", path: "install-grafana.sh"
+  #   subconfig.vm.provision "shell", path: "config-grafana.sh"
+  #   subconfig.vm.network "forwarded_port", guest: 3000, host: 43000
+  #   subconfig.vm.network "forwarded_port", guest: 9090, host: 49090
+  # end
+  #
+  # config.vm.define "elasticsearch" do |subconfig|
+  #   subconfig.vm.box = BOX_IMAGE
+  #   subconfig.vm.hostname = "elasticsearch"
+  #   subconfig.vm.network "private_network", ip: "10.0.0.16"
+  #   subconfig.vm.provider :virtualbox do |vb|
+  #            vb.customize ['modifyvm', :id,'--memory', '2048']
+  #   end
+  #   subconfig.vm.provision "shell" do |s|
+  #     s.path = "install-elasticsearch.sh"
+  #     s.args = ["10.0.0.16"]
+  #   end
+  #   subconfig.vm.provision "shell" do |s|
+  #     s.path = "install-kibana.sh"
+  #     s.args = ["10.0.0.16"]
+  #   end
+  #   subconfig.vm.provision "shell" do |s|
+  #     s.path = "install-logstash.sh"
+  #     s.args = ["10.0.0.16"]
+  #   end
+  #   subconfig.vm.provision "shell" do |s|
+  #     s.path = "install-rsyslog-server.sh"
+  #     s.args = ["10.0.0.16"]
+  #   end
+  # end
+
 end
