@@ -51,13 +51,17 @@ function has_apt_get {
   [ -n "$(command -v apt-get)" ]
 }
 
+function has_setcap {
+  [ -n "$(command -v setcap)" ]
+}
+
 function install_dependencies {
   local func="install_dependencies"
   log "INFO" ${func} "Installing dependencies"
 
   if has_apt_get; then
     sudo apt-get update -y
-    sudo apt-get install -y curl unzip jq
+    sudo apt-get install -y curl unzip jq libcap2-bin
   else
     log "ERROR" ${func} "Could not find apt-get or yum. Cannot install dependencies on this OS."
     exit 1
@@ -95,7 +99,12 @@ function install_vault {
   unzip vault.zip
   sudo chown root:root ${bin}
   sudo mv $bin "${install_bin}"
-  sudo setcap cap_ipc_lock=+ep "${install_bin}"
+  if has_setcap; then
+    sudo setcap cap_ipc_lock=+ep "${install_bin}"
+  else
+    log "ERROR" ${func} "Could not find setcap.  Please resolve this dependency before continuing"
+    exit 1
+  fi
   rm vault.zip
 }
 
@@ -110,29 +119,23 @@ function create_vault_install_paths {
   log "INFO" ${func} "username = ${username}, config = ${config}"
   sudo mkdir -p "${path}"
   cat << EOF | sudo tee ${TMP_DIR}/outy
-
 listener "tcp" {
   address         = "127.0.0.1:8200"
   cluster_address = "127.0.0.1:8201"
   tls_disable     = "true"
 }
-
 storage "consul" {
   address = "127.0.0.1:7500"
   path = "vault/"
   service = "vault"
 }
-
 ui = true
-
 telemetry {
   dogstatsd_addr = "localhost:8125"
   disable_hostname = true
 }
-
 api_addr = "http://${ip_addr}:8200"
 cluster_addr = "https://${ip_addr}:8201"
-
 EOF
 
   sudo cp ${TMP_DIR}/outy ${path}${config}
@@ -153,7 +156,6 @@ Documentation=https://www.vaultproject.io/docs/
 Requires=network-online.target
 After=network-online.target
 ConditionFileNotEmpty=/etc/vault.d/vault.hcl
-
 [Service]
 User=vault
 Group=vault
@@ -175,7 +177,6 @@ RestartSec=5
 TimeoutStopSec=30
 StartLimitIntervalSec=60
 StartLimitBurst=3
-
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -187,7 +188,6 @@ EOF
 
 function setup_bash_profile {
   cat <<EOF >> /etc/bash.bashrc
-
 export VAULT_ADDR=http://127.0.0.1:8200
 EOF
 }
